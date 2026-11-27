@@ -1,8 +1,10 @@
 rules_version = '2';
 
-// Each family's data lives under users/{owner uid}. The owner can read and write all of it.
-// People whose verified Google email is in that document's `members` list can too,
-// but only the owner can change who the members are.
+// Each family's data lives under users/{owner uid}.
+// Parents: the owner, plus anyone whose verified Google email is in that document's `members` list,
+//   can read and write everything in the family. Only the owner can change who the parents are.
+// Kids: a kid's login is linked to one kid record by kidLogins/{kid's uid}. A kid can read the family
+//   settings, their own kid record, their own entries and the reward store, and can change only their goal.
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
@@ -18,11 +20,31 @@ service cloud.firestore {
       return signedIn() && myEmail() != '' &&
         myEmail() in get(/databases/$(database)/documents/users/$(ownerId)).data.get('members', []);
     }
+    function isParent(ownerId) {
+      return isOwner(ownerId) || isMember(ownerId);
+    }
+    function hasKidLink() {
+      return signedIn() && exists(/databases/$(database)/documents/kidLogins/$(request.auth.uid));
+    }
+    function kidLink() {
+      return get(/databases/$(database)/documents/kidLogins/$(request.auth.uid)).data;
+    }
+    function isKidOf(ownerId) {
+      return hasKidLink() && kidLink().ownerUid == ownerId;
+    }
+
+    match /kidLogins/{kidUid} {
+      allow get: if signedIn() && (request.auth.uid == kidUid || isParent(resource.data.ownerUid));
+      allow create: if isParent(request.resource.data.ownerUid) &&
+        request.resource.data.keys().hasOnly(['ownerUid', 'kidId', 'username']);
+      allow delete: if isParent(resource.data.ownerUid);
+    }
 
     match /users/{ownerId} {
       allow get: if isOwner(ownerId) ||
-        (signedIn() && myEmail() != '' && myEmail() in resource.data.get('members', []));
-      // Lets a member find the family they were added to.
+        (signedIn() && myEmail() != '' && myEmail() in resource.data.get('members', [])) ||
+        isKidOf(ownerId);
+      // Lets a parent find the family they were added to.
       allow list: if signedIn() && request.auth.token.email_verified == true &&
         request.auth.token.email in resource.data.members;
       allow create, delete: if isOwner(ownerId);
@@ -30,7 +52,18 @@ service cloud.firestore {
         (isMember(ownerId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rate']));
 
       match /{coll}/{docId} {
-        allow read, write: if isOwner(ownerId) || isMember(ownerId);
+        allow read, write: if isParent(ownerId);
+      }
+      match /kids/{kidId} {
+        allow get: if isKidOf(ownerId) && kidLink().kidId == kidId;
+        allow update: if isKidOf(ownerId) && kidLink().kidId == kidId &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['goalId']);
+      }
+      match /tx/{txId} {
+        allow read: if isKidOf(ownerId) && resource.data.kidId == kidLink().kidId;
+      }
+      match /rewards/{rewardId} {
+        allow read: if isKidOf(ownerId);
       }
     }
   }

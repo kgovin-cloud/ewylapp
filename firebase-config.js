@@ -8,3 +8,7 @@ export const firebaseConfig = {
   messagingSenderId: '765283452345',
   appId: '1:765283452345:web:3bb637419ba6516d35e268',
 };
+
+// Optional: a reCAPTCHA Enterprise site key for Firebase App Check (Firebase console > Security > App Check).
+// App Check makes sure AI requests come from this app. Leave empty to skip it.
+export const appCheckSiteKey = '6LdfnTUuAAAAAFDNxVad02ryPihARSKQ4HyoEQwV';

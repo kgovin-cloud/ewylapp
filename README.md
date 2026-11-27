@@ -1,4 +1,4 @@
-# Ewyl Points
+# EWYL - Earn While You Learn
 
 A small web app (installable on Android as a PWA) to track points kids earn for goals and spend on rewards.
 

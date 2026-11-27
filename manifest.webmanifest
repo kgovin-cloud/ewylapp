@@ -1,6 +1,6 @@
 {
-  "name": "Ewyl Points",
-  "short_name": "Points",
+  "name": "EWYL - Earn While You Learn",
+  "short_name": "EWYL",
   "description": "Track points your kids earn for goals and spend on rewards.",
   "start_url": "./",
   "scope": "./",

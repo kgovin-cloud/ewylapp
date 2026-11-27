@@ -4,19 +4,37 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#4f46e5">
-  <title>Ewyl Points</title>
+  <title>EWYL - Earn While You Learn</title>
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon-192.png">
   <link rel="apple-touch-icon" href="icons/icon-180.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="bar">
-    <button id="back" class="icon-btn" aria-label="Back" hidden>&#8249;</button>
-    <h1 id="title">Ewyl Points</h1>
-    <a id="settings-link" class="icon-btn" href="#/settings" aria-label="Settings">&#9881;</a>
+  <header class="top">
+    <div class="brand">
+      <div class="logo">★</div>
+      <div class="brand-text">
+        <div class="brand-line">
+          <h1>EWYL</h1>
+          <span id="rate-badge" class="badge" hidden></span>
+        </div>
+        <p class="tagline">Earn While You Learn</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <a id="sync-pill" class="pill" href="#/settings" hidden><span class="dot"></span><span class="pill-text"></span></a>
+    </div>
   </header>
+  <section id="kid-tabs" class="kid-tabs" hidden></section>
   <main id="app"></main>
+  <nav id="nav" class="nav" hidden>
+    <a href="#/" data-tab="home"><span class="nav-icon">🏠</span><span>Home</span></a>
+    <a href="#/rewards" data-tab="rewards"><span class="nav-icon">🎁</span><span>Rewards</span></a>
+    <a href="#/history" data-tab="history"><span class="nav-icon">📜</span><span>History</span></a>
+    <a href="#/settings" data-tab="settings"><span class="nav-icon">⚙️</span><span>Settings</span></a>
+  </nav>
+  <div id="toast" class="toast" hidden></div>
   <script type="module" src="app.js"></script>
 </body>
 </html>

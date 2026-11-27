@@ -1,6 +1,6 @@
 // App files: network first, so updates show up as soon as you're online; cached copy when offline.
 // Firebase SDK files: cache first, since each version's URL never changes.
-const CACHE = 'ewyl-v2';
+const CACHE = 'ewyl-v3';
 const SDK_PREFIX = 'https://www.gstatic.com/firebasejs/';
 const SHELL = [
   './',
