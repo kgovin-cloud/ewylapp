@@ -88,6 +88,7 @@ sidebar, Home in two columns, rewards as a card grid, settings cards in two colu
 - Live: `npx firebase-tools deploy --only hosting,firestore:rules`.
 - Preview without touching live: `npx firebase-tools hosting:channel:deploy <name> --expires 7d`
   (shares the live Firestore data and rules). Preview used for the redesign: `redesign`.
-- Console setup already done: Google and Email/Password sign-in providers, AI Logic (Gemini Developer API),
-  App Check with reCAPTCHA Enterprise.
+- Console setup done: Google sign-in, AI Logic (Gemini Developer API), App Check with reCAPTCHA Enterprise.
+  The Email/Password provider, needed for kid logins ("auth/operation-not-allowed" until it's on), was not
+  enabled at first deploy; the user was enabling it on 2026-11-28.
 - Nothing has an automated test; changes were checked by syntax check and by the user in the browser.
