@@ -1,10 +1,37 @@
 rules_version = '2';
 
-// Each signed-in user can read and write only their own data under users/{their uid}.
+// Each family's data lives under users/{owner uid}. The owner can read and write all of it.
+// People whose verified Google email is in that document's `members` list can too,
+// but only the owner can change who the members are.
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    function signedIn() {
+      return request.auth != null;
+    }
+    function myEmail() {
+      return request.auth.token.email_verified == true ? request.auth.token.email : '';
+    }
+    function isOwner(ownerId) {
+      return signedIn() && request.auth.uid == ownerId;
+    }
+    function isMember(ownerId) {
+      return signedIn() && myEmail() != '' &&
+        myEmail() in get(/databases/$(database)/documents/users/$(ownerId)).data.get('members', []);
+    }
+
+    match /users/{ownerId} {
+      allow get: if isOwner(ownerId) ||
+        (signedIn() && myEmail() != '' && myEmail() in resource.data.get('members', []));
+      // Lets a member find the family they were added to.
+      allow list: if signedIn() && request.auth.token.email_verified == true &&
+        request.auth.token.email in resource.data.members;
+      allow create, delete: if isOwner(ownerId);
+      allow update: if isOwner(ownerId) ||
+        (isMember(ownerId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rate']));
+
+      match /{coll}/{docId} {
+        allow read, write: if isOwner(ownerId) || isMember(ownerId);
+      }
     }
   }
 }

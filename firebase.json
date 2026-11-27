@@ -6,7 +6,13 @@
       ".firebaserc",
       "firestore.rules",
       "README.md",
+      "CLAUDE.md",
+      ".git",
+      ".git/**",
+      ".firebase",
+      ".firebase/**",
       "**/.*",
+      "**/.*/**",
       "**/node_modules/**"
     ],
     "headers": [

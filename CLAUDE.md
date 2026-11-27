@@ -35,7 +35,7 @@ This repo uses **git**, not Perforce. The global CLAUDE.md rule about Perforce d
 ## Data model (Firestore)
 
 ```
-users/{uid}                  { rate }                       # ₹ per point
+users/{uid}                  { rate, members, ownerEmail }  # ₹ per point; members = emails sharing this family
 users/{uid}/kids/{id}        { name, emoji, created }
 users/{uid}/activities/{id}  { name, points, created }      # quick-pick list for awarding
 users/{uid}/rewards/{id}     { name, points, created }      # quick-pick list for spending
@@ -43,7 +43,12 @@ users/{uid}/tx/{id}          { kidId, kind: 'earn'|'spend', points, label, note,
 ```
 
 A balance is the sum of a kid's earn entries minus their spend entries; it is never stored. The first sign-in
-seeds default activities and rewards. Writes aren't awaited, because Firestore applies them locally first, and
+seeds default activities and rewards.
+
+**Family sharing:** the data tree belongs to the parent who created it. They add other parents by email in
+Settings → Family (stored in `members`, lowercase). At sign-in, `findFamily` queries `users` where `members`
+array-contains the user's email; if found, the app uses that owner's tree (`ownerUid`), cached per device in
+localStorage. Rules let members read/write everything under the owner's tree except `members`/`ownerEmail`. Writes aren't awaited, because Firestore applies them locally first, and
 `onSnapshot` listeners update the in-memory `db` and re-render.
 
 ## Features
@@ -57,8 +62,9 @@ seeds default activities and rewards. Writes aren't awaited, because Firestore a
 
 ## Status and next steps
 
-- Code is written and committed. It has been syntax-checked only and **not yet run in a browser**.
-- **Not deployed yet.** The user needs to run `npx firebase-tools login` once. Then deploy with
-  `npx firebase-tools deploy --only hosting,firestore:rules`.
-- After deploying: test on the phone (Google sign-in, award, spend, offline use, install to home screen).
-- Possible later work: let a second parent share the same family data. Right now data is per Google account.
+- Deployed to https://ewylapp.web.app (deploy: `npx firebase-tools deploy --only hosting,firestore:rules`).
+  Google sign-in had to be enabled in the Firebase console; it works on the laptop.
+- `firebase.json` must explicitly ignore `.git/**`: on Windows `**/.*` did not exclude it, and the first deploy
+  published `.git`.
+- To test: phone sign-in (earlier it bounced back to the sign-in page, likely due to the then-missing Google
+  provider), family sharing with a second account, offline use, install to home screen.

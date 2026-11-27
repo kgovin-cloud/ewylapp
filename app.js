@@ -5,11 +5,12 @@ import {
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   doc, collection, onSnapshot, setDoc, deleteDoc, writeBatch,
+  query, where, getDocs, arrayUnion, arrayRemove,
 } from 'https://www.gstatic.com/firebasejs/12.6.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
-// Data layout in Firestore, one tree per signed-in user:
-//   users/{uid}                       { rate }
+// Data layout in Firestore, one tree per family, stored under the uid of the parent who created it:
+//   users/{uid}                       { rate, members: [emails], ownerEmail }
 //   users/{uid}/kids/{id}             { name, emoji, created }
 //   users/{uid}/activities/{id}       { name, points, created }
 //   users/{uid}/rewards/{id}          { name, points, created }
@@ -100,7 +101,7 @@ function defaultItems() {
   };
 }
 
-const emptyDb = () => ({ rate: 10, kids: [], activities: [], rewards: [], tx: [] });
+const emptyDb = () => ({ rate: 10, members: [], ownerEmail: '', kids: [], activities: [], rewards: [], tx: [] });
 
 // ---------- Firebase
 
@@ -121,14 +122,24 @@ let user;             // undefined = still checking, null = signed out
 let ready = false;    // first snapshot of everything has arrived
 let unsubs = [];
 let seeded = false;
+let ownerUid;         // whose data tree is shown: the user's own, or the family owner's if they were added
 
-const userDoc = () => doc(fs, 'users', user.uid);
+const userDoc = () => doc(fs, 'users', ownerUid);
+const isOwner = () => user && ownerUid === user.uid;
+const ownerKey = u => 'ewyl-owner-' + u.uid;
 const itemRef = (c, id) => doc(collection(userDoc(), c), id);
 const withoutId = ({ id, ...rest }) => rest;
 
 let errorShown = false;
 function onSyncError(e) {
   console.error(e);
+  if (e.code === 'permission-denied' && user && ownerUid && !isOwner()) {
+    // The family owner removed this account. Go back to this account's own data.
+    localStorage.removeItem(ownerKey(user));
+    alert('You no longer have access to the shared family data.');
+    location.reload();
+    return;
+  }
   if (errorShown) return;
   errorShown = true;
   alert('Could not sync with the cloud: ' + e.message);
@@ -169,8 +180,9 @@ function stopSync() {
   seeded = false;
 }
 
-function startSync() {
+function startSync(owner) {
   stopSync();
+  ownerUid = owner;
   const pending = new Set(['settings', ...COLLS]);
   const arrived = key => {
     pending.delete(key);
@@ -179,9 +191,12 @@ function startSync() {
   };
   unsubs.push(onSnapshot(userDoc(), snap => {
     if (snap.exists()) {
-      const r = Number(snap.data().rate);
+      const data = snap.data();
+      const r = Number(data.rate);
       db.rate = r > 0 ? r : 10;
-    } else if (!snap.metadata.fromCache) {
+      db.members = Array.isArray(data.members) ? data.members.filter(m => typeof m === 'string') : [];
+      db.ownerEmail = str(data.ownerEmail);
+    } else if (!snap.metadata.fromCache && isOwner()) {
       seedDefaults(); // first sign-in ever for this account
     }
     arrived('settings');
@@ -193,6 +208,43 @@ function startSync() {
       arrived(c);
     }, onSyncError));
   }
+}
+
+// Finds the family this account was added to, if any. Returns the owner's uid, or the user's own uid.
+async function findFamily(u) {
+  if (!u.email) return u.uid;
+  const snap = await getDocs(query(collection(fs, 'users'), where('members', 'array-contains', u.email)));
+  const fam = snap.docs.find(d => d.id !== u.uid);
+  if (fam) return fam.id;
+  // Offline with nothing cached: keep whatever was used last time on this device.
+  if (snap.metadata.fromCache) return localStorage.getItem(ownerKey(u)) || u.uid;
+  return u.uid;
+}
+
+let authSeq = 0;
+async function onUser(u) {
+  const seq = ++authSeq;
+  user = u;
+  if (!u) {
+    stopSync();
+    ownerUid = undefined;
+    render();
+    return;
+  }
+  // Start right away with the family used last time on this device, so the app opens fast and offline.
+  const cached = localStorage.getItem(ownerKey(u));
+  if (cached) startSync(cached);
+  else render();
+  let owner;
+  try {
+    owner = await findFamily(u);
+  } catch (e) {
+    console.warn('Could not look up family', e);
+    owner = cached || u.uid;
+  }
+  if (seq !== authSeq) return;
+  localStorage.setItem(ownerKey(u), owner);
+  if (owner !== cached) startSync(owner);
 }
 
 async function signIn() {
@@ -530,6 +582,35 @@ function renderKid(kid) {
     historyList(kidFilter === 'all' ? txs : txs.filter(t => t.kind === kidFilter), false));
 }
 
+function familySection() {
+  if (!isOwner()) {
+    return h('section', { class: 'card' },
+      h('h2', null, 'Family'),
+      h('p', { class: 'muted' }, `You are sharing the family data of ${db.ownerEmail || 'another parent'}. ` +
+        'Changes you make are seen by everyone in the family.'));
+  }
+  const email = h('input', { type: 'email', placeholder: 'name@gmail.com', autocomplete: 'off' });
+  const add = () => {
+    const e = email.value.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return alert('Enter a valid email address.');
+    if (e === (user.email || '').toLowerCase()) return alert('That is your own account.');
+    setDoc(userDoc(), { members: arrayUnion(e), ownerEmail: user.email || '' }, { merge: true }).catch(onSyncError);
+    email.value = '';
+  };
+  const remove = m => {
+    if (!confirm(`Stop sharing with ${m}?`)) return;
+    setDoc(userDoc(), { members: arrayRemove(m) }, { merge: true }).catch(onSyncError);
+  };
+  return h('section', { class: 'card' },
+    h('h2', null, 'Family'),
+    h('p', { class: 'muted' }, 'People you add here see and change the same kids and points when they sign in ' +
+      'with that Google account.'),
+    db.members.length ? h('div', { class: 'list' }, db.members.map(m =>
+      h('button', { class: 'list-row', onclick: () => remove(m) }, m, h('span', { class: 'chev' }, '✕'))))
+      : h('p', { class: 'muted' }, 'Only you so far.'),
+    h('div', { class: 'row' }, email, h('button', { class: 'btn', onclick: add }, 'Add')));
+}
+
 function renderSettings() {
   setHeader('Settings', true);
 
@@ -562,6 +643,7 @@ function renderSettings() {
       a => editQuick('activities', a), () => editQuick('activities'), 'Add activity'),
     listSection('Quick rewards', db.rewards, r => `${r.name} · ${pts(r.points)}`,
       r => editQuick('rewards', r), () => editQuick('rewards'), 'Add reward'),
+    familySection(),
     h('section', { class: 'card' },
       h('h2', null, 'Account'),
       h('p', { class: 'muted' }, `Signed in as ${user.email || user.displayName || 'unknown'}. ` +
@@ -615,12 +697,7 @@ backBtn.addEventListener('click', () => { location.hash = '#/'; });
 window.addEventListener('hashchange', render);
 
 if (configured) {
-  onAuthStateChanged(auth, u => {
-    user = u;
-    if (u) startSync();
-    else stopSync();
-    render();
-  });
+  onAuthStateChanged(auth, onUser);
 }
 render();
 
