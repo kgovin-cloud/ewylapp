@@ -43,13 +43,13 @@ users/{uid}/tx/{id}          { kidId, kind: 'earn'|'spend', points, label, note,
 ```
 
 A balance is the sum of a kid's earn entries minus their spend entries; it is never stored. The first sign-in
-seeds default activities and rewards.
+seeds default activities and rewards. Writes aren't awaited, because Firestore applies them locally first, and
+`onSnapshot` listeners update the in-memory `db` and re-render.
 
 **Family sharing:** the data tree belongs to the parent who created it. They add other parents by email in
 Settings → Family (stored in `members`, lowercase). At sign-in, `findFamily` queries `users` where `members`
 array-contains the user's email; if found, the app uses that owner's tree (`ownerUid`), cached per device in
-localStorage. Rules let members read/write everything under the owner's tree except `members`/`ownerEmail`. Writes aren't awaited, because Firestore applies them locally first, and
-`onSnapshot` listeners update the in-memory `db` and re-render.
+localStorage. Rules let members read/write everything under the owner's tree except `members`/`ownerEmail`.
 
 ## Features
 
