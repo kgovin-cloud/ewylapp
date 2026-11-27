@@ -13,20 +13,26 @@ No build step: plain HTML, CSS and JavaScript, with the Firebase SDK loaded from
 
 1. Go to <https://console.firebase.google.com>, then **Create a project** (Google Analytics is not needed).
 2. **Build > Authentication > Get started > Sign-in method > Google > Enable**, then Save.
-3. **Authentication > Settings > Authorized domains > Add domain**, and add `kgovin-cloud.github.io`.
-4. **Build > Firestore Database > Create database**. Pick a location near you (for example `asia-south1`, Mumbai)
+3. **Build > Firestore Database > Create database**. Pick a location near you (for example `asia-south1`, Mumbai)
    and start in **production mode**.
-5. **Firestore > Rules**: replace the rules with the contents of [`firestore.rules`](firestore.rules), then **Publish**.
-6. **Project settings (gear) > General > Your apps > Web (`</>`)**: register an app (no Firebase Hosting needed),
+4. **Firestore > Rules**: replace the rules with the contents of [`firestore.rules`](firestore.rules), then **Publish**.
+5. **Project settings (gear) > General > Your apps > Web (`</>`)**: register an app,
    then copy the `firebaseConfig` values into [`firebase-config.js`](firebase-config.js).
 
 The config values are not secrets. Anyone can see them in a web app. The Firestore rules are what keep each
 account's data private.
 
-## Hosting on GitHub Pages
+## Deploying (Firebase Hosting)
 
-Repo **Settings > Pages > Build and deployment**: Source **Deploy from a branch**, Branch **main**, folder **/ (root)**.
-The app is then at <https://kgovin-cloud.github.io/ewylapp/>.
+One time: `npx firebase-tools login`.
+
+Then, from this folder:
+
+```
+npx firebase-tools deploy --only hosting,firestore:rules
+```
+
+The app is at <https://ewylapp.web.app>. That domain is already authorized for Google sign-in.
 
 ## Installing on Android
 
